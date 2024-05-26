@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Bluetooth</title>
+    <link rel="stylesheet" type="text/css" href="GC.css">
+    <style>
+        #devices {
+            border: 1px solid black;
+            padding: 10px;
+            width: 300px;
+            height: 300px;
+            overflow: auto;
+        }
+        .device {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+    </style>
+    <script>
+        var devices = [];
+
+        function search() {
+            navigator.bluetooth.requestDevice({ 
+                filters: [{
+                    services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+                }]
+            })
+            .then(device => {
+                // 检查设备是否已经在设备列表中
+                if (devices.some(d => d.name === device.name)) {
+                    console.log('Device ' + device.name + ' is already in the list.');
+                    return;
+                }
+
+                var deviceElement = document.createElement('div');
+                deviceElement.className = 'device';
+                deviceElement.setAttribute('data-name', device.name);  // 添加 data-name 属性
+
+                var deviceName = document.createElement('span');
+                deviceName.textContent = device.name;
+
+                var connectButton = document.createElement('button');
+                connectButton.textContent = '连接';
+                connectButton.className = 'connect-button';  // 添加类名
+                connectButton.onclick = function() {
+                    connect(device, connectButton, statusSpan);
+                };
+
+                var statusSpan = document.createElement('span');
+                statusSpan.textContent = '未连接';
+                statusSpan.className = 'status';  // 添加类名
+
+                deviceElement.appendChild(deviceName);
+                deviceElement.appendChild(connectButton);
+                deviceElement.appendChild(statusSpan);
+                document.getElementById('devices').appendChild(deviceElement);
+
+                // 当设备断开连接时，更新设备的连接状态
+                device.addEventListener('gattserverdisconnected', function() {
+                    updateDeviceStatus(device);
+                });
+
+                devices.push(device);  // 将设备对象添加到 devices 数组中
+            })
+            .catch(error => { console.log(error); });
+        }
+
+        function connect(device, button, statusSpan) {
+            console.log('Connecting to GATT Server...');
+            device.gatt.connect()
+            .then(server => {
+                console.log('Connected to ' + server.device.name);
+                button.textContent = '断开连接';
+                statusSpan.textContent = '已连接';
+                button.onclick = function() {
+                    disconnect(device, button, statusSpan);
+                };
+            })
+            .catch(error => { 
+                console.log(error); 
+                button.textContent = '设备未连接';
+                statusSpan.textContent = '未连接';
+            });
+        }
+
+        function disconnect(device, button, statusSpan) {
+            if (device.gatt.connected) {
+                console.log('Disconnecting from ' + device.name);
+                device.gatt.disconnect();
+            }
+        }
+
+        function disconnectAll() {
+            devices.forEach(device => {
+                if (device.gatt.connected) {
+                    console.log('Disconnecting from ' + device.name);
+                    device.gatt.disconnect();
+                }
+            });
+        }
+
+        function updateDeviceStatus(device) {
+            // 更新设备的连接状态
+            var deviceElement = document.querySelector('.device[data-name="' + device.name + '"]');
+            if (deviceElement) {
+                var connectButton = deviceElement.querySelector('.connect-button');  // 找到连接按钮
+                var statusSpan = deviceElement.querySelector('.status');  // 找到状态元素
+                if (connectButton && statusSpan) {
+                    connectButton.textContent = '连接';  // 更新按钮文本
+                    statusSpan.textContent = '已断开';  // 更新状态文本
+                    connectButton.onclick = function() {
+                        connect(device, connectButton, statusSpan);
+                    };
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>网页蓝牙</h1>
+    <div class="center-container">
+        <div class="button-container">
+            <button onclick="search()">搜索蓝牙设备</button>
+            <button onclick="disconnectAll()">断开所有连接</button>
+        </div>
+        <div id="devices"></div>
+    </div>
+</body>
+</html>
